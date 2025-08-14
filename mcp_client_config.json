@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "wled": {
+      "command": "python",
+      "args": ["-m", "wled_mcp.server"],
+      "env": {
+        "WLED_HOST": "192.168.2.135"
+      }
+    }
+  }
+}
