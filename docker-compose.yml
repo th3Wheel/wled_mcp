@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  wled-mcp:
+    build: .
+    image: wled-mcp:latest
+    container_name: wled-mcp-server
+    restart: unless-stopped
+    
+    # Configuration option 1: Single device (backward compatible)
+    # Uncomment and set your WLED device IP
+    # environment:
+    #   - WLED_HOST=192.168.1.100
+    
+    # Configuration option 2: Multiple devices via JSON
+    # Uncomment and configure your devices
+    environment:
+      - WLED_DEVICES={"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}
+    
+    # Configuration option 3: Multiple devices via individual variables
+    # Uncomment and configure your devices
+    # environment:
+    #   - WLED_DEVICE_LIVING_ROOM=192.168.1.100
+    #   - WLED_DEVICE_BEDROOM=192.168.1.101
+    #   - WLED_DEVICE_KITCHEN=192.168.1.102
+    
+    # Network mode host allows access to local network devices
+    network_mode: host
+    
+    # Optional: Mount config file if needed
+    # volumes:
+    #   - ./config:/app/config
