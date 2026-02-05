@@ -13,7 +13,7 @@ services:
     # Configuration option 2: Multiple devices via JSON
     # Uncomment and configure your devices
     environment:
-      - WLED_DEVICES={"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}
+      - 'WLED_DEVICES={"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}'
     
     # Configuration option 3: Multiple devices via individual variables
     # Uncomment and configure your devices

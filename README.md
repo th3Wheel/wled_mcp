@@ -67,7 +67,7 @@ Or build the Docker image manually:
 
 ```bash
 docker build -t wled-mcp .
-docker run -e WLED_DEVICES='{"living_room":"192.168.1.100"}' --network host wled-mcp
+docker run -e WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.101"}' --network host wled-mcp
 ```
 
 ## Quick Start
