@@ -202,8 +202,8 @@ async def wled_set_color(r: int, g: int, b: int, device_name: Optional[str] = No
         r: Red component (0-255)
         g: Green component (0-255)
         b: Blue component (0-255)
-        device_name: Name of configured device (optional if direct_ip is provided or single device configured)
-        direct_ip: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
