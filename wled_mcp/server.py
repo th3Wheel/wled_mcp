@@ -83,8 +83,8 @@ def _save_to_yaml_file() -> bool:
         _config_file_path = _get_config_file_path()
     
     try:
-        # Ensure directory exists
-        _config_file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure directory exists with secure permissions
+        _config_file_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         # Create config structure
         config = {
@@ -344,11 +344,13 @@ async def wled_get_config_path() -> str:
         JSON string with config file path and existence status
     """
     config_path = _get_config_file_path()
+    parent_exists = config_path.parent.exists()
     
     return json.dumps({
         "config_path": str(config_path),
         "exists": config_path.exists(),
-        "can_write": os.access(config_path.parent, os.W_OK) if config_path.parent.exists() else True
+        "can_write": os.access(config_path.parent, os.W_OK) if parent_exists else False,
+        "parent_exists": parent_exists
     }, indent=2)
 
 

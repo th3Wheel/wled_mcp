@@ -7,8 +7,9 @@ services:
     
     # Configuration option 1: YAML config file (Recommended - Persistent)
     # Mount your config file into the container
+    # Note: Use $HOME instead of ~ for docker-compose, or use absolute path
     # volumes:
-    #   - ~/.wled_mcp/config.yaml:/root/.wled_mcp/config.yaml
+    #   - $HOME/.wled_mcp/config.yaml:/root/.wled_mcp/config.yaml
     
     # Configuration option 2: Single device (backward compatible)
     # Uncomment and set your WLED device IP
