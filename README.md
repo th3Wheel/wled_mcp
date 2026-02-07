@@ -2,10 +2,12 @@
 
 A Model Context Protocol (MCP) server for controlling WLED devices through LLM interactions. This server enables Claude and other LLMs to directly control your WLED smart lighting devices with natural language commands.
 
-**NEW: Now supports multiple WLED devices and Docker deployment!**
+**NEW: Persistent device storage with YAML config files, in-memory caching, and device management tools!**
 
 ## Features
 
+- **Persistent Device Storage**: YAML config file with automatic caching for fast access
+- **Device Management Tools**: Add, update, and remove devices via MCP tools
 - **Multi-Device Support**: Control multiple WLED devices simultaneously with named device management
 - **Docker Support**: Easy deployment with Docker and docker-compose
 - **Device Control**: Turn WLED devices on/off, adjust brightness (0-255)
@@ -74,7 +76,32 @@ docker run -e WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.
 
 ### 1. Configure Your WLED Device(s)
 
-#### Single Device (Backward Compatible)
+#### Option A: YAML Config File (Recommended - Persistent Storage)
+
+Create a config file at `~/.wled_mcp/config.yaml`:
+
+```yaml
+devices:
+  living_room: 192.168.1.100
+  bedroom: 192.168.1.101
+  kitchen: 192.168.1.102
+```
+
+Or copy the example:
+
+```bash
+mkdir -p ~/.wled_mcp
+cp config.example.yaml ~/.wled_mcp/config.yaml
+# Edit with your devices
+```
+
+**Benefits:**
+- Persistent storage across restarts
+- In-memory caching for fast access
+- Easy to edit and version control
+- Manage devices via MCP tools (add/update/remove)
+
+#### Option B: Single Device (Backward Compatible)
 
 Set your WLED device IP address:
 
@@ -82,19 +109,25 @@ Set your WLED device IP address:
 export WLED_HOST=192.168.1.100
 ```
 
-#### Multiple Devices - Option A: JSON Configuration
+#### Option C: Multiple Devices - JSON Environment Variable
 
 ```bash
 export WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}'
 ```
 
-#### Multiple Devices - Option B: Individual Environment Variables
+#### Option D: Multiple Devices - Individual Environment Variables
 
 ```bash
 export WLED_DEVICE_LIVING_ROOM=192.168.1.100
 export WLED_DEVICE_BEDROOM=192.168.1.101
 export WLED_DEVICE_KITCHEN=192.168.1.102
 ```
+
+**Configuration Priority** (highest to lowest):
+1. YAML config file (`~/.wled_mcp/config.yaml` or `$WLED_CONFIG_FILE`)
+2. `WLED_DEVICES` environment variable
+3. `WLED_DEVICE_*` environment variables
+4. `WLED_HOST` environment variable
 
 ### 2. Test the Connection
 
@@ -178,6 +211,10 @@ You can now ask Claude to control your WLED devices with natural language:
 ### Device Management
 
 - `wled_list_devices()` - List all configured WLED devices with their names and IP addresses
+- `wled_add_device(device_name: str, ip_address: str)` - Add a new device to the configuration
+- `wled_update_device(device_name: str, ip_address: str)` - Update an existing device's IP address
+- `wled_remove_device(device_name: str)` - Remove a device from the configuration
+- `wled_get_config_path()` - Get the path to the YAML config file and its status
 
 ### Basic Controls
 
@@ -229,6 +266,9 @@ Once configured, you can use natural language commands:
 #### Multi-Device:
 ```
 "List all my WLED devices"
+"Add a new device called patio with IP 192.168.1.105"
+"Update the bedroom device to use IP 192.168.1.150"
+"Remove the old office device"
 "Turn on the living room lights"
 "Set the bedroom lights to blue"
 "What's the current state of the kitchen lights?"
@@ -239,6 +279,12 @@ Once configured, you can use natural language commands:
 ### Direct API Usage
 
 ```python
+# Device management
+await wled_add_device("patio", "192.168.1.105")
+await wled_update_device("bedroom", "192.168.1.150")
+await wled_remove_device("office")
+await wled_list_devices()
+
 # Single device - backward compatible
 await wled_set_power(True)
 await wled_set_color(128, 0, 128)

@@ -5,17 +5,22 @@ services:
     container_name: wled-mcp-server
     restart: unless-stopped
     
-    # Configuration option 1: Single device (backward compatible)
+    # Configuration option 1: YAML config file (Recommended - Persistent)
+    # Mount your config file into the container
+    # volumes:
+    #   - ~/.wled_mcp/config.yaml:/root/.wled_mcp/config.yaml
+    
+    # Configuration option 2: Single device (backward compatible)
     # Uncomment and set your WLED device IP
     # environment:
     #   - WLED_HOST=192.168.1.100
     
-    # Configuration option 2: Multiple devices via JSON
+    # Configuration option 3: Multiple devices via JSON
     # Uncomment and configure your devices
     environment:
       - 'WLED_DEVICES={"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}'
     
-    # Configuration option 3: Multiple devices via individual variables
+    # Configuration option 4: Multiple devices via individual variables
     # Uncomment and configure your devices
     # environment:
     #   - WLED_DEVICE_LIVING_ROOM=192.168.1.100
@@ -25,6 +30,11 @@ services:
     # Network mode host allows access to local network devices
     network_mode: host
     
-    # Optional: Mount config file if needed
+    # Optional: Persist config file in container
+    # This allows device management via MCP tools to persist
     # volumes:
-    #   - ./config:/app/config
+    #   - wled-config:/root/.wled_mcp
+
+# Optional: Named volume for persistent config
+# volumes:
+#   wled-config:

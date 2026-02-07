@@ -3,7 +3,9 @@
 import json
 import os
 from typing import Any, Dict, Optional
+from pathlib import Path
 import logging
+import yaml
 
 from mcp.server.fastmcp import FastMCP
 from .wled_client import WLEDClient
@@ -15,14 +17,115 @@ logger = logging.getLogger(__name__)
 # Initialize MCP server
 mcp = FastMCP("WLED Controller")
 
-# Global device registry
+# Global device registry (cached in memory)
 _devices: Dict[str, str] = {}
+_config_file_path: Optional[Path] = None
+
+def _get_config_file_path() -> Path:
+    """Get the path to the YAML config file."""
+    # Check environment variable first
+    config_path = os.getenv("WLED_CONFIG_FILE")
+    if config_path:
+        return Path(config_path)
+    
+    # Default to ~/.wled_mcp/config.yaml
+    home = Path.home()
+    config_dir = home / ".wled_mcp"
+    return config_dir / "config.yaml"
+
+def _load_from_yaml_file() -> bool:
+    """Load devices from YAML config file.
+    
+    Returns:
+        True if devices were loaded from file, False otherwise
+    """
+    global _devices, _config_file_path
+    
+    config_path = _get_config_file_path()
+    _config_file_path = config_path
+    
+    if not config_path.exists():
+        logger.info(f"Config file not found at {config_path}")
+        return False
+    
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        if not config or 'devices' not in config:
+            logger.warning(f"No devices found in config file {config_path}")
+            return False
+        
+        devices = config['devices']
+        if not isinstance(devices, dict):
+            logger.error(f"Invalid devices format in {config_path}")
+            return False
+        
+        _devices = devices
+        logger.info(f"Loaded {len(_devices)} devices from config file {config_path}")
+        return True
+    except yaml.YAMLError as e:
+        logger.error(f"Failed to parse YAML config file {config_path}: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Error reading config file {config_path}: {e}")
+        return False
+
+def _save_to_yaml_file() -> bool:
+    """Save current devices to YAML config file.
+    
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    global _devices, _config_file_path
+    
+    if _config_file_path is None:
+        _config_file_path = _get_config_file_path()
+    
+    try:
+        # Ensure directory exists
+        _config_file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create config structure
+        config = {
+            'devices': _devices
+        }
+        
+        # Write to file with comments
+        with open(_config_file_path, 'w') as f:
+            f.write("# WLED MCP Device Configuration\n")
+            f.write("# Format: device_name: ip_address\n")
+            f.write("#\n")
+            f.write("# Example:\n")
+            f.write("#   living_room: 192.168.1.100\n")
+            f.write("#   bedroom: 192.168.1.101\n")
+            f.write("#\n")
+            yaml.dump(config, f, default_flow_style=False, sort_keys=True)
+        
+        logger.info(f"Saved {len(_devices)} devices to config file {_config_file_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving config file {_config_file_path}: {e}")
+        return False
 
 def _load_devices():
-    """Load device configurations from environment variables."""
+    """Load device configurations from multiple sources with priority order.
+    
+    Priority:
+    1. YAML config file (~/.wled_mcp/config.yaml or WLED_CONFIG_FILE env var)
+    2. WLED_DEVICES environment variable (JSON)
+    3. WLED_DEVICE_* environment variables
+    4. WLED_HOST environment variable (backward compatibility)
+    
+    Devices are cached in memory after loading.
+    """
     global _devices
     
-    # Try to load from WLED_DEVICES JSON config first
+    # Priority 1: Try to load from YAML config file
+    if _load_from_yaml_file():
+        return
+    
+    # Priority 2: Try to load from WLED_DEVICES JSON config
     devices_json = os.getenv("WLED_DEVICES")
     if devices_json:
         try:
@@ -32,21 +135,21 @@ def _load_devices():
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse WLED_DEVICES JSON: {e}")
     
-    # Load from individual WLED_DEVICE_* environment variables
+    # Priority 3: Load from individual WLED_DEVICE_* environment variables
     for key, value in os.environ.items():
         if key.startswith("WLED_DEVICE_") and key != "WLED_DEVICES":
             device_name = key.replace("WLED_DEVICE_", "").lower()
             _devices[device_name] = value
             logger.info(f"Loaded device '{device_name}' from {key}")
     
-    # Backward compatibility: if WLED_HOST is set, use it as default device
+    # Priority 4: Backward compatibility - if WLED_HOST is set, use it as default device
     if not _devices:
         host = os.getenv("WLED_HOST")
         if host:
             _devices["default"] = host
             logger.info(f"Loaded single device from WLED_HOST as 'default'")
 
-# Load devices on module import
+# Load devices on module import (cached in memory)
 _load_devices()
 
 def get_wled_client(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> WLEDClient:
@@ -98,12 +201,154 @@ async def wled_list_devices() -> str:
     if not _devices:
         return json.dumps({
             "devices": {},
-            "message": "No devices configured. Set WLED_DEVICES, WLED_DEVICE_*, or WLED_HOST environment variables."
+            "message": "No devices configured. Set WLED_DEVICES, WLED_DEVICE_*, WLED_HOST environment variables, or use YAML config file."
         }, indent=2)
+    
+    config_source = "YAML config file" if _config_file_path and _config_file_path.exists() else "environment variables"
     
     return json.dumps({
         "devices": _devices,
-        "count": len(_devices)
+        "count": len(_devices),
+        "source": config_source
+    }, indent=2)
+
+
+@mcp.tool()
+async def wled_add_device(device_name: str, ip_address: str) -> str:
+    """Add a new WLED device to the configuration.
+    
+    Args:
+        device_name: Unique name for the device (e.g., "living_room")
+        ip_address: IP address of the WLED device (e.g., "192.168.1.100")
+    
+    Returns:
+        JSON string with operation result
+    """
+    global _devices
+    
+    # Validate device name
+    if not device_name or not device_name.replace("_", "").replace("-", "").isalnum():
+        return json.dumps({
+            "success": False,
+            "error": "Invalid device name. Use alphanumeric characters, underscores, and hyphens only."
+        }, indent=2)
+    
+    # Check if device already exists
+    if device_name in _devices:
+        return json.dumps({
+            "success": False,
+            "error": f"Device '{device_name}' already exists with IP {_devices[device_name]}"
+        }, indent=2)
+    
+    # Add device to registry
+    _devices[device_name] = ip_address
+    
+    # Save to YAML file
+    if _save_to_yaml_file():
+        logger.info(f"Added device '{device_name}' with IP {ip_address}")
+        return json.dumps({
+            "success": True,
+            "message": f"Device '{device_name}' added successfully",
+            "device": {device_name: ip_address}
+        }, indent=2)
+    else:
+        return json.dumps({
+            "success": False,
+            "error": "Failed to save configuration to file. Device added to memory only."
+        }, indent=2)
+
+
+@mcp.tool()
+async def wled_remove_device(device_name: str) -> str:
+    """Remove a WLED device from the configuration.
+    
+    Args:
+        device_name: Name of the device to remove
+    
+    Returns:
+        JSON string with operation result
+    """
+    global _devices
+    
+    if device_name not in _devices:
+        return json.dumps({
+            "success": False,
+            "error": f"Device '{device_name}' not found in configuration"
+        }, indent=2)
+    
+    # Remove device
+    removed_ip = _devices.pop(device_name)
+    
+    # Save to YAML file
+    if _save_to_yaml_file():
+        logger.info(f"Removed device '{device_name}' (IP: {removed_ip})")
+        return json.dumps({
+            "success": True,
+            "message": f"Device '{device_name}' removed successfully",
+            "removed": {device_name: removed_ip}
+        }, indent=2)
+    else:
+        # Rollback if save failed
+        _devices[device_name] = removed_ip
+        return json.dumps({
+            "success": False,
+            "error": "Failed to save configuration to file. No changes made."
+        }, indent=2)
+
+
+@mcp.tool()
+async def wled_update_device(device_name: str, ip_address: str) -> str:
+    """Update the IP address of an existing WLED device.
+    
+    Args:
+        device_name: Name of the device to update
+        ip_address: New IP address for the device
+    
+    Returns:
+        JSON string with operation result
+    """
+    global _devices
+    
+    if device_name not in _devices:
+        return json.dumps({
+            "success": False,
+            "error": f"Device '{device_name}' not found in configuration"
+        }, indent=2)
+    
+    old_ip = _devices[device_name]
+    _devices[device_name] = ip_address
+    
+    # Save to YAML file
+    if _save_to_yaml_file():
+        logger.info(f"Updated device '{device_name}' IP from {old_ip} to {ip_address}")
+        return json.dumps({
+            "success": True,
+            "message": f"Device '{device_name}' updated successfully",
+            "old_ip": old_ip,
+            "new_ip": ip_address
+        }, indent=2)
+    else:
+        # Rollback if save failed
+        _devices[device_name] = old_ip
+        return json.dumps({
+            "success": False,
+            "error": "Failed to save configuration to file. No changes made."
+        }, indent=2)
+
+
+@mcp.tool()
+async def wled_get_config_path() -> str:
+    """Get the path to the YAML configuration file.
+    
+    Returns:
+        JSON string with config file path and existence status
+    """
+    config_path = _get_config_file_path()
+    
+    return json.dumps({
+        "config_path": str(config_path),
+        "exists": config_path.exists(),
+        "can_write": os.access(config_path.parent, os.W_OK) if config_path.parent.exists() else True
     }, indent=2)
 
 

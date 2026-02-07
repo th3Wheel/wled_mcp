@@ -1,0 +1,34 @@
+# WLED MCP Device Configuration
+# 
+# This is an example configuration file for the WLED MCP server.
+# Copy this file to ~/.wled_mcp/config.yaml and customize it for your setup.
+# 
+# You can also set a custom location using the WLED_CONFIG_FILE environment variable:
+#   export WLED_CONFIG_FILE=/path/to/your/config.yaml
+#
+# Format: Each device has a name (key) and an IP address (value)
+#
+# The configuration is cached in memory when the server starts, providing
+# fast access to device information without repeated file reads.
+
+devices:
+  # Living room LED strip
+  living_room: 192.168.1.100
+  
+  # Bedroom ambient lighting
+  bedroom: 192.168.1.101
+  
+  # Kitchen under-cabinet lights
+  kitchen: 192.168.1.102
+  
+  # Office desk lamp
+  office: 192.168.1.103
+  
+  # Outdoor patio lights
+  patio: 192.168.1.104
+
+# Configuration priority (highest to lowest):
+# 1. YAML config file (~/.wled_mcp/config.yaml or WLED_CONFIG_FILE)
+# 2. WLED_DEVICES environment variable (JSON format)
+# 3. WLED_DEVICE_* environment variables
+# 4. WLED_HOST environment variable (single device, backward compatible)
