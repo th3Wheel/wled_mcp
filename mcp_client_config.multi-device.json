@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "wled": {
+      "command": "python",
+      "args": ["-m", "wled_mcp.server"],
+      "env": {
+        "WLED_DEVICES": "{\"living_room\":\"192.168.1.100\",\"bedroom\":\"192.168.1.101\",\"kitchen\":\"192.168.1.102\"}"
+      }
+    }
+  }
+}

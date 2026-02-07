@@ -2,8 +2,14 @@
 
 A Model Context Protocol (MCP) server for controlling WLED devices through LLM interactions. This server enables Claude and other LLMs to directly control your WLED smart lighting devices with natural language commands.
 
+**NEW: Persistent device storage with YAML config files, in-memory caching, and device management tools!**
+
 ## Features
 
+- **Persistent Device Storage**: YAML config file with automatic caching for fast access
+- **Device Management Tools**: Add, update, and remove devices via MCP tools
+- **Multi-Device Support**: Control multiple WLED devices simultaneously with named device management
+- **Docker Support**: Easy deployment with Docker and docker-compose
 - **Device Control**: Turn WLED devices on/off, adjust brightness (0-255)
 - **Color Management**: Set RGB colors with precise control
 - **Effects & Animation**: Access 100+ built-in lighting effects with customizable speed and intensity
@@ -27,6 +33,8 @@ By using this software, you acknowledge that you understand these risks and agre
 
 ## Installation
 
+### Option 1: Standard Python Installation
+
 1. Clone this repository:
 
 ```bash
@@ -40,9 +48,60 @@ cd wled_mcp
 pip install -e .
 ```
 
+### Option 2: Docker Installation (Recommended for Multi-Device)
+
+1. Clone this repository:
+
+```bash
+git clone https://github.com/mrkprdo/wled_mcp.git
+cd wled_mcp
+```
+
+2. Configure your devices in `docker-compose.yml` (see Configuration section below)
+
+3. Build and run with docker-compose:
+
+```bash
+docker-compose up -d
+```
+
+Or build the Docker image manually:
+
+```bash
+docker build -t wled-mcp .
+docker run -e WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.101"}' --network host wled-mcp
+```
+
 ## Quick Start
 
-### 1. Configure Your WLED Device
+### 1. Configure Your WLED Device(s)
+
+#### Option A: YAML Config File (Recommended - Persistent Storage)
+
+Create a config file at `~/.wled_mcp/config.yaml`:
+
+```yaml
+devices:
+  living_room: 192.168.1.100
+  bedroom: 192.168.1.101
+  kitchen: 192.168.1.102
+```
+
+Or copy the example:
+
+```bash
+mkdir -p ~/.wled_mcp
+cp config.example.yaml ~/.wled_mcp/config.yaml
+# Edit with your devices
+```
+
+**Benefits:**
+- Persistent storage across restarts
+- In-memory caching for fast access
+- Easy to edit and version control
+- Manage devices via MCP tools (add/update/remove)
+
+#### Option B: Single Device (Backward Compatible)
 
 Set your WLED device IP address:
 
@@ -50,15 +109,45 @@ Set your WLED device IP address:
 export WLED_HOST=192.168.1.100
 ```
 
+#### Option C: Multiple Devices - JSON Environment Variable
+
+```bash
+export WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.101","kitchen":"192.168.1.102"}'
+```
+
+#### Option D: Multiple Devices - Individual Environment Variables
+
+```bash
+export WLED_DEVICE_LIVING_ROOM=192.168.1.100
+export WLED_DEVICE_BEDROOM=192.168.1.101
+export WLED_DEVICE_KITCHEN=192.168.1.102
+```
+
+**Configuration Priority** (highest to lowest):
+1. YAML config file (`~/.wled_mcp/config.yaml` or `$WLED_CONFIG_FILE`)
+2. `WLED_DEVICES` environment variable
+3. `WLED_DEVICE_*` environment variables
+4. `WLED_HOST` environment variable
+
 ### 2. Test the Connection
 
-Run the test script to verify connectivity:
+#### Single Device Test
 
 ```bash
 python examples/test_server.py
 ```
 
+#### Multi-Device Test
+
+```bash
+export WLED_DEVICE_LIVING_ROOM=192.168.1.100
+export WLED_DEVICE_BEDROOM=192.168.1.101
+python examples/test_multi_device.py
+```
+
 ### 3. Use with Claude Desktop
+
+#### Single Device Configuration
 
 Add this configuration to your Claude Desktop MCP settings:
 
@@ -76,47 +165,88 @@ Add this configuration to your Claude Desktop MCP settings:
 }
 ```
 
+#### Multi-Device Configuration
+
+Add this configuration to your Claude Desktop MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "wled": {
+      "command": "python",
+      "args": ["-m", "wled_mcp.server"],
+      "env": {
+        "WLED_DEVICES": "{\"living_room\":\"192.168.1.100\",\"bedroom\":\"192.168.1.101\",\"kitchen\":\"192.168.1.102\"}"
+      }
+    }
+  }
+}
+```
+
+Or use the example configuration file:
+
+```bash
+cp mcp_client_config.multi-device.json ~/.config/claude/config.json
+```
+
 ### 4. Start Controlling Your WLED
 
-You can now ask Claude to control your WLED device with natural language:
+You can now ask Claude to control your WLED devices with natural language:
 
+#### Single Device Commands:
 - "Turn on my WLED and set it to bright blue"
 - "Set a rainbow effect with medium speed"
 - "Dim the lights to 25% brightness"
-- "Show me the current device status"
-- "Activate my bedtime preset"
-- "Set the lights to a warm white color"
-- "List all available effects"
+
+#### Multi-Device Commands:
+- "Turn on the living room lights and set them to warm white"
+- "Set the bedroom to a soft blue color"
+- "Turn off all devices" (Claude will iterate through your devices)
+- "Set the kitchen lights to rainbow effect"
+- "Show me all configured devices"
+- "What's the status of the bedroom lights?"
 
 ## Available Tools
 
+### Device Management
+
+- `wled_list_devices()` - List all configured WLED devices with their names and IP addresses
+- `wled_add_device(device_name: str, ip_address: str)` - Add a new device to the configuration
+- `wled_update_device(device_name: str, ip_address: str)` - Update an existing device's IP address
+- `wled_remove_device(device_name: str)` - Remove a device from the configuration
+- `wled_get_config_path()` - Get the path to the YAML config file and its status
+
 ### Basic Controls
 
-- `wled_set_power(on: bool, host?: str)` - Turn device on/off
-- `wled_set_brightness(brightness: int, host?: str)` - Set brightness (0-255)
-- `wled_set_color(r: int, g: int, b: int, host?: str)` - Set RGB color (0-255 each)
+- `wled_set_power(on: bool, device_name?: str, direct_ip?: str)` - Turn device on/off
+- `wled_set_brightness(brightness: int, device_name?: str, direct_ip?: str)` - Set brightness (0-255)
+- `wled_set_color(r: int, g: int, b: int, device_name?: str, direct_ip?: str)` - Set RGB color (0-255 each)
 
 ### Effects & Animation
 
-- `wled_set_effect(effect_id: int, speed?: int, intensity?: int, host?: str)` - Set lighting effect with optional speed/intensity (0-255)
-- `wled_get_effects(host?: str)` - List all available effects with IDs and names
-- `wled_get_palettes(host?: str)` - List available color palettes
+- `wled_set_effect(effect_id: int, speed?: int, intensity?: int, device_name?: str, direct_ip?: str)` - Set lighting effect with optional speed/intensity (0-255)
+- `wled_get_effects(device_name?: str, direct_ip?: str)` - List all available effects with IDs and names
+- `wled_get_palettes(device_name?: str, direct_ip?: str)` - List available color palettes
 
 ### Presets
 
-- `wled_get_presets(host?: str)` - List all saved presets with IDs and names
-- `wled_activate_preset(preset_id: int, host?: str)` - Activate a preset by ID (1-250)
+- `wled_get_presets(device_name?: str, direct_ip?: str)` - List all saved presets with IDs and names
+- `wled_activate_preset(preset_id: int, device_name?: str, direct_ip?: str)` - Activate a preset by ID (1-250)
 
 ### Device Information
 
-- `wled_get_info(host?: str)` - Get device information (name, version, LED count, capabilities)
-- `wled_get_state(host?: str)` - Get current device state (power, brightness, color, effect)
+- `wled_get_info(device_name?: str, direct_ip?: str)` - Get device information (name, version, LED count, capabilities)
+- `wled_get_state(device_name?: str, direct_ip?: str)` - Get current device state (power, brightness, color, effect)
 
 ### Advanced
 
-- `wled_set_state(state_json: str, host?: str)` - Set device state using raw JSON for complex operations
+- `wled_set_state(state_json: str, device_name?: str, direct_ip?: str)` - Set device state using raw JSON for complex operations
 
-_Note: All tools support an optional `host` parameter. If not provided, the `WLED_HOST` environment variable will be used._
+_Note: All tools support two optional parameters for targeting devices:_
+- _`device_name`: Reference a pre-configured device from your registry (e.g., "living_room")_
+- _`direct_ip`: Specify an IP address directly for ad-hoc connections (e.g., "192.168.1.105")_
+- _If neither is provided, the default device or `WLED_HOST` environment variable will be used._
+- _`direct_ip` takes precedence if both parameters are provided._
 
 ## Example Usage
 
@@ -124,6 +254,7 @@ _Note: All tools support an optional `host` parameter. If not provided, the `WLE
 
 Once configured, you can use natural language commands:
 
+#### Single Device:
 ```
 "Turn on my WLED lights and set them to a soft purple color"
 "Set a rainbow effect with slow speed"
@@ -132,22 +263,106 @@ Once configured, you can use natural language commands:
 "Set brightness to 50%"
 ```
 
+#### Multi-Device:
+```
+"List all my WLED devices"
+"Add a new device called patio with IP 192.168.1.105"
+"Update the bedroom device to use IP 192.168.1.150"
+"Remove the old office device"
+"Turn on the living room lights"
+"Set the bedroom lights to blue"
+"What's the current state of the kitchen lights?"
+"Turn off all the lights in the bedroom"
+"Set living room to rainbow effect and bedroom to solid red"
+```
+
 ### Direct API Usage
 
 ```python
-# Turn on and set to purple
+# Device management
+await wled_add_device("patio", "192.168.1.105")
+await wled_update_device("bedroom", "192.168.1.150")
+await wled_remove_device("office")
+await wled_list_devices()
+
+# Single device - backward compatible
 await wled_set_power(True)
 await wled_set_color(128, 0, 128)
 
+# Multi-device - using device names from registry
+await wled_set_power(True, device_name="living_room")
+await wled_set_color(255, 0, 0, device_name="bedroom")
+
+# Ad-hoc connection - using direct IP (no configuration needed)
+await wled_set_color(0, 255, 0, direct_ip="192.168.1.105")
+
 # Set rainbow effect with custom speed
-await wled_set_effect(9, speed=150, intensity=200)
+await wled_set_effect(9, speed=150, intensity=200, device_name="kitchen")
 
 # Get device info
-info = await wled_get_info()
+info = await wled_get_info(device_name="living_room")
+
+# List all devices
+devices = await wled_list_devices()
 
 # Activate a preset
-await wled_activate_preset(3)
+await wled_activate_preset(3, device_name="bedroom")
 ```
+
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
+1. Edit `docker-compose.yml` and configure your devices:
+
+```yaml
+environment:
+  - WLED_DEVICES={"living_room":"192.168.1.100","bedroom":"192.168.1.101"}
+```
+
+2. Start the container:
+
+```bash
+docker-compose up -d
+```
+
+3. View logs:
+
+```bash
+docker-compose logs -f
+```
+
+4. Stop the container:
+
+```bash
+docker-compose down
+```
+
+### Using Docker Run
+
+Single device:
+```bash
+docker build -t wled-mcp .
+docker run -d --name wled-mcp --network host \
+  -e WLED_HOST=192.168.1.100 \
+  wled-mcp
+```
+
+Multiple devices:
+```bash
+docker run -d --name wled-mcp --network host \
+  -e WLED_DEVICES='{"living_room":"192.168.1.100","bedroom":"192.168.1.101"}' \
+  wled-mcp
+```
+
+### Docker with MCP Client
+
+To use with Claude Desktop when running in Docker, you'll need to expose the MCP server. The recommended approach is:
+
+1. Run the container with host networking (as shown above)
+2. Configure Claude Desktop to connect to the containerized server
+
+Note: Docker deployment is primarily useful for running the server as a persistent service. For direct Claude Desktop integration, local installation is typically easier.
 
 ## Troubleshooting
 
@@ -155,14 +370,32 @@ await wled_activate_preset(3)
 
 - **Connection Errors**:
 
-  - Ensure your WLED device is powered on and connected to the same network
-  - Verify the IP address is correct (check your router or WLED web interface)
+  - Ensure your WLED devices are powered on and connected to the same network
+  - Verify the IP addresses are correct (check your router or WLED web interface)
   - Test connectivity with `ping <WLED_IP>`
+  - If using Docker with host networking, ensure the container can access your local network
 
 - **Environment Variable Issues**:
 
-  - Make sure `WLED_HOST` is set correctly: `export WLED_HOST=192.168.1.100`
+  - Make sure environment variables are set correctly
+  - For single device: `export WLED_HOST=192.168.1.100`
+  - For multiple devices JSON: `export WLED_DEVICES='{"name":"ip"}'`
+  - For multiple devices individual: `export WLED_DEVICE_NAME=192.168.1.100`
   - On Windows: `set WLED_HOST=192.168.1.100`
+
+- **Multi-Device Issues**:
+
+  - Use `wled_list_devices()` to verify devices are loaded correctly
+  - Device names are case-insensitive and derived from environment variable names
+  - Ensure JSON format is valid when using `WLED_DEVICES`
+  - Check logs for device loading messages
+
+- **Docker Issues**:
+
+  - Use `--network host` to allow container to access local network devices
+  - Check container logs: `docker logs wled-mcp` or `docker-compose logs`
+  - Verify environment variables are passed correctly to container
+  - Ensure WLED devices are on the same network as the Docker host
 
 - **Tool/Command Errors**:
 
@@ -179,11 +412,20 @@ await wled_activate_preset(3)
 
 Run the test script to verify everything works:
 
+#### Single Device:
 ```bash
+export WLED_HOST=192.168.1.100
 python examples/test_server.py
 ```
 
-This will test basic connectivity and functionality with your WLED device.
+#### Multiple Devices:
+```bash
+export WLED_DEVICE_LIVING_ROOM=192.168.1.100
+export WLED_DEVICE_BEDROOM=192.168.1.101
+python examples/test_multi_device.py
+```
+
+This will test basic connectivity and functionality with your WLED device(s).
 
 ## Development
 
