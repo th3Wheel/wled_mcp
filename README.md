@@ -181,31 +181,35 @@ You can now ask Claude to control your WLED devices with natural language:
 
 ### Basic Controls
 
-- `wled_set_power(on: bool, device_name?: str, host?: str)` - Turn device on/off
-- `wled_set_brightness(brightness: int, device_name?: str, host?: str)` - Set brightness (0-255)
-- `wled_set_color(r: int, g: int, b: int, device_name?: str, host?: str)` - Set RGB color (0-255 each)
+- `wled_set_power(on: bool, device_name?: str, direct_ip?: str)` - Turn device on/off
+- `wled_set_brightness(brightness: int, device_name?: str, direct_ip?: str)` - Set brightness (0-255)
+- `wled_set_color(r: int, g: int, b: int, device_name?: str, direct_ip?: str)` - Set RGB color (0-255 each)
 
 ### Effects & Animation
 
-- `wled_set_effect(effect_id: int, speed?: int, intensity?: int, device_name?: str, host?: str)` - Set lighting effect with optional speed/intensity (0-255)
-- `wled_get_effects(device_name?: str, host?: str)` - List all available effects with IDs and names
-- `wled_get_palettes(device_name?: str, host?: str)` - List available color palettes
+- `wled_set_effect(effect_id: int, speed?: int, intensity?: int, device_name?: str, direct_ip?: str)` - Set lighting effect with optional speed/intensity (0-255)
+- `wled_get_effects(device_name?: str, direct_ip?: str)` - List all available effects with IDs and names
+- `wled_get_palettes(device_name?: str, direct_ip?: str)` - List available color palettes
 
 ### Presets
 
-- `wled_get_presets(device_name?: str, host?: str)` - List all saved presets with IDs and names
-- `wled_activate_preset(preset_id: int, device_name?: str, host?: str)` - Activate a preset by ID (1-250)
+- `wled_get_presets(device_name?: str, direct_ip?: str)` - List all saved presets with IDs and names
+- `wled_activate_preset(preset_id: int, device_name?: str, direct_ip?: str)` - Activate a preset by ID (1-250)
 
 ### Device Information
 
-- `wled_get_info(device_name?: str, host?: str)` - Get device information (name, version, LED count, capabilities)
-- `wled_get_state(device_name?: str, host?: str)` - Get current device state (power, brightness, color, effect)
+- `wled_get_info(device_name?: str, direct_ip?: str)` - Get device information (name, version, LED count, capabilities)
+- `wled_get_state(device_name?: str, direct_ip?: str)` - Get current device state (power, brightness, color, effect)
 
 ### Advanced
 
-- `wled_set_state(state_json: str, device_name?: str, host?: str)` - Set device state using raw JSON for complex operations
+- `wled_set_state(state_json: str, device_name?: str, direct_ip?: str)` - Set device state using raw JSON for complex operations
 
-_Note: All tools support optional `device_name` parameter to target a specific configured device, or `host` parameter for direct IP addressing. If neither is provided, the default device or `WLED_HOST` environment variable will be used._
+_Note: All tools support two optional parameters for targeting devices:_
+- _`device_name`: Reference a pre-configured device from your registry (e.g., "living_room")_
+- _`direct_ip`: Specify an IP address directly for ad-hoc connections (e.g., "192.168.1.105")_
+- _If neither is provided, the default device or `WLED_HOST` environment variable will be used._
+- _`direct_ip` takes precedence if both parameters are provided._
 
 ## Example Usage
 
@@ -239,12 +243,12 @@ Once configured, you can use natural language commands:
 await wled_set_power(True)
 await wled_set_color(128, 0, 128)
 
-# Multi-device - using device names
+# Multi-device - using device names from registry
 await wled_set_power(True, device_name="living_room")
 await wled_set_color(255, 0, 0, device_name="bedroom")
 
-# Multi-device - using direct host
-await wled_set_color(0, 255, 0, host="192.168.1.105")
+# Ad-hoc connection - using direct IP (no configuration needed)
+await wled_set_color(0, 255, 0, direct_ip="192.168.1.105")
 
 # Set rainbow effect with custom speed
 await wled_set_effect(9, speed=150, intensity=200, device_name="kitchen")

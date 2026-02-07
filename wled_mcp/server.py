@@ -49,21 +49,25 @@ def _load_devices():
 # Load devices on module import
 _load_devices()
 
-def get_wled_client(device_name: Optional[str] = None, host: Optional[str] = None) -> WLEDClient:
+def get_wled_client(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> WLEDClient:
     """Get WLED client instance.
     
     Args:
-        device_name: Name of the device from registry
-        host: Direct host IP (overrides device_name)
+        device_name: Name of a pre-configured device from the registry (e.g., "living_room")
+        direct_ip: Direct IP address for ad-hoc connections (e.g., "192.168.1.105"), 
+                   bypasses registry lookup and overrides device_name if both provided
         
     Returns:
         WLEDClient instance
+        
+    Note:
+        Priority order: direct_ip > device_name > "default" device > WLED_HOST env var
     """
-    # Direct host takes precedence
-    if host:
-        return WLEDClient(host)
+    # Direct IP takes precedence - allows ad-hoc connections without configuration
+    if direct_ip:
+        return WLEDClient(direct_ip)
     
-    # Use device name from registry
+    # Use device name from registry - for pre-configured devices
     if device_name:
         if device_name not in _devices:
             raise ValueError(f"Unknown device: {device_name}. Available devices: {list(_devices.keys())}")
@@ -73,14 +77,14 @@ def get_wled_client(device_name: Optional[str] = None, host: Optional[str] = Non
     if "default" in _devices:
         return WLEDClient(_devices["default"])
     
-    # Last resort: check WLED_HOST
+    # Last resort: check WLED_HOST environment variable
     fallback_host = os.getenv("WLED_HOST")
     if fallback_host:
         return WLEDClient(fallback_host)
     
     raise ValueError(
-        "No device specified. Either provide device_name, host parameter, "
-        "or configure devices via WLED_DEVICES or WLED_HOST environment variables"
+        "No device specified. Either provide device_name (for configured devices), "
+        "direct_ip (for ad-hoc connections), or configure devices via WLED_DEVICES or WLED_HOST environment variables"
     )
 
 
@@ -104,18 +108,23 @@ async def wled_list_devices() -> str:
 
 
 @mcp.tool()
-async def wled_get_info(device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_get_info(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Get WLED device information including version, LED count, and capabilities.
     
     Args:
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry (e.g., "living_room")
+        direct_ip: Direct IP address for ad-hoc connection (e.g., "192.168.1.105")
     
     Returns:
         JSON string with device information
+        
+    Note:
+        - Use device_name for pre-configured devices in your registry
+        - Use direct_ip for temporary/ad-hoc connections without configuration
+        - If neither provided, uses default device or WLED_HOST environment variable
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         info = await client.get_info()
         return json.dumps(info, indent=2)
     except Exception as e:
@@ -124,18 +133,18 @@ async def wled_get_info(device_name: Optional[str] = None, host: Optional[str] =
 
 
 @mcp.tool()
-async def wled_get_state(device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_get_state(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Get current WLED device state including power, brightness, colors, and effects.
     
     Args:
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry (e.g., "bedroom")
+        direct_ip: Direct IP address for ad-hoc connection (e.g., "192.168.1.105")
     
     Returns:
         JSON string with current device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         state = await client.get_state()
         return json.dumps(state, indent=2)
     except Exception as e:
@@ -144,19 +153,19 @@ async def wled_get_state(device_name: Optional[str] = None, host: Optional[str] 
 
 
 @mcp.tool()
-async def wled_set_power(on: bool, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_set_power(on: bool, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Turn WLED device on or off.
     
     Args:
         on: True to turn on, False to turn off
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         result = await client.set_power(on)
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -165,19 +174,19 @@ async def wled_set_power(on: bool, device_name: Optional[str] = None, host: Opti
 
 
 @mcp.tool()
-async def wled_set_brightness(brightness: int, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_set_brightness(brightness: int, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Set WLED device brightness.
     
     Args:
         brightness: Brightness level (0-255)
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         result = await client.set_brightness(brightness)
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -186,21 +195,21 @@ async def wled_set_brightness(brightness: int, device_name: Optional[str] = None
 
 
 @mcp.tool()
-async def wled_set_color(r: int, g: int, b: int, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_set_color(r: int, g: int, b: int, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Set WLED device color using RGB values.
     
     Args:
         r: Red component (0-255)
         g: Green component (0-255)
         b: Blue component (0-255)
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of configured device (optional if direct_ip is provided or single device configured)
+        direct_ip: WLED device IP address or hostname (optional, overrides device_name)
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         result = await client.set_color(r, g, b)
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -210,21 +219,21 @@ async def wled_set_color(r: int, g: int, b: int, device_name: Optional[str] = No
 
 @mcp.tool()
 async def wled_set_effect(effect_id: int, speed: Optional[int] = None, 
-                         intensity: Optional[int] = None, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+                         intensity: Optional[int] = None, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Set WLED lighting effect.
     
     Args:
         effect_id: Effect ID number (0 for solid color, 1+ for various effects)
         speed: Effect speed (0-255, optional)
         intensity: Effect intensity (0-255, optional)
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         result = await client.set_effect(effect_id, speed, intensity)
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -233,18 +242,18 @@ async def wled_set_effect(effect_id: int, speed: Optional[int] = None,
 
 
 @mcp.tool()
-async def wled_get_effects(device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_get_effects(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Get list of available WLED effects.
     
     Args:
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with available effects and their IDs
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         effects = await client.get_effects()
         return json.dumps(effects, indent=2)
     except Exception as e:
@@ -253,18 +262,18 @@ async def wled_get_effects(device_name: Optional[str] = None, host: Optional[str
 
 
 @mcp.tool()
-async def wled_get_palettes(device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_get_palettes(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Get list of available WLED color palettes.
     
     Args:
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with available color palettes
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         palettes = await client.get_palettes()
         return json.dumps(palettes, indent=2)
     except Exception as e:
@@ -273,18 +282,18 @@ async def wled_get_palettes(device_name: Optional[str] = None, host: Optional[st
 
 
 @mcp.tool()
-async def wled_get_presets(device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_get_presets(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Get list of available WLED presets.
     
     Args:
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with available presets and their names/IDs
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         presets = await client.get_presets()
         return json.dumps(presets, indent=2)
     except Exception as e:
@@ -293,19 +302,19 @@ async def wled_get_presets(device_name: Optional[str] = None, host: Optional[str
 
 
 @mcp.tool()
-async def wled_activate_preset(preset_id: int, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_activate_preset(preset_id: int, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Activate a WLED preset by ID.
     
     Args:
         preset_id: Preset ID to activate (1-250)
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         result = await client.activate_preset(preset_id)
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -314,19 +323,19 @@ async def wled_activate_preset(preset_id: int, device_name: Optional[str] = None
 
 
 @mcp.tool()
-async def wled_set_state(state_json: str, device_name: Optional[str] = None, host: Optional[str] = None) -> str:
+async def wled_set_state(state_json: str, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
     """Set WLED device state using raw JSON state object for advanced control.
     
     Args:
         state_json: JSON string representing the state to set
-        device_name: Name of configured device (optional if host is provided or single device configured)
-        host: WLED device IP address or hostname (optional, overrides device_name)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
     
     Returns:
         JSON string with updated device state
     """
     try:
-        client = get_wled_client(device_name, host)
+        client = get_wled_client(device_name, direct_ip)
         state = json.loads(state_json)
         result = await client.set_state(state)
         return json.dumps(result, indent=2)
