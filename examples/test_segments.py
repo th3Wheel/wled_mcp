@@ -82,9 +82,9 @@ async def test_config_and_segments():
                 print("✓ Created segment (LEDs 0-30) with red color")
                 await asyncio.sleep(2)
                 
-                # Then create segment from LED 30-60 with blue color
+                # Then create segment from LED 30-59 with blue color (stop index 60 is exclusive)
                 result = await client.create_segment(30, 60, {"col": [[0, 0, 255]]})
-                print("✓ Created segment (LEDs 30-60) with blue color")
+                print("✓ Created segment (LEDs 30-59) with blue color")
                 await asyncio.sleep(2)
             else:
                 print("⊘ Skipping segment creation test (device has < 60 LEDs)")

@@ -78,7 +78,7 @@ async def test_mcp_tools():
             if led_count > 60:
                 # Note: Creating segments may modify existing segment configuration
                 result = await server.wled_create_segment(0, 30, '{"col":[[0,255,0]]}')
-                print("✓ wled_create_segment() works - created green segment (LEDs 0-30)")
+                print("✓ wled_create_segment() works - created green segment (LEDs 0-29)")
                 await asyncio.sleep(2)
             else:
                 print("⊘ Skipped (device has < 60 LEDs)")

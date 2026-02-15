@@ -718,7 +718,7 @@ async def wled_create_segment(start: int, stop: int, segment_json: Optional[str]
         JSON string with updated device state
         
     Example:
-        Create segment from LED 0-30 with red color: 
+        Create segment from LED 0-29 with red color: 
         start=0, stop=30, segment_json='{"col":[[255,0,0]]}'
     """
     try:

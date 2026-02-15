@@ -191,8 +191,8 @@ class WLEDClient:
         Returns:
             Updated state from device
         """
-        # Ensure segment_id is included in the data
-        segment_update = {"id": segment_id, **segment_data}
+        # Ensure segment_id is included in the data and takes precedence
+        segment_update = {**segment_data, "id": segment_id}
         return await self.set_state({"seg": [segment_update]})
     
     async def create_segment(self, start: int, stop: int, segment_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -206,13 +206,14 @@ class WLEDClient:
         Returns:
             Updated state from device
         """
-        new_segment = {
-            "start": start,
-            "stop": stop
-        }
-        
         if segment_data:
-            new_segment.update(segment_data)
+            # Ensure explicit parameters take precedence over any keys in segment_data
+            new_segment = {**segment_data, "start": start, "stop": stop}
+        else:
+            new_segment = {
+                "start": start,
+                "stop": stop,
+            }
         
         return await self.set_state({"seg": [new_segment]})
     
