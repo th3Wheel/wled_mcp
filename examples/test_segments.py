@@ -77,9 +77,9 @@ async def test_config_and_segments():
             led_count = config.get('hw', {}).get('led', {}).get('total', 0)
             if led_count > 60:
                 # Note: Creating new segments may modify or split existing segments
-                # First create segment from LED 0-30 with red color
+                # First create segment from LED 0-29 with red color (stop index 30 is exclusive)
                 result = await client.create_segment(0, 30, {"col": [[255, 0, 0]]})
-                print("✓ Created segment (LEDs 0-30) with red color")
+                print("✓ Created segment (LEDs 0-29) with red color")
                 await asyncio.sleep(2)
                 
                 # Then create segment from LED 30-59 with blue color (stop index 60 is exclusive)
