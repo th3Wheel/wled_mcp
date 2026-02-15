@@ -135,3 +135,111 @@ class WLEDClient:
         if not 1 <= preset_id <= 250:
             raise ValueError("Preset ID must be between 1 and 250")
         return await self.set_state({"ps": preset_id})
+    
+    async def get_config(self) -> Dict[str, Any]:
+        """Get device configuration.
+        
+        Returns:
+            Full device configuration including hardware, network, and segment settings
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://{self.host}/json/cfg",
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            return response.json()
+    
+    async def get_segments(self) -> Dict[str, Any]:
+        """Get all segments from device state.
+        
+        Returns:
+            Dictionary with segments array and count
+        """
+        state = await self.get_state()
+        segments = state.get("seg", [])
+        return {
+            "segments": segments,
+            "count": len(segments)
+        }
+    
+    async def get_segment(self, segment_id: int) -> Dict[str, Any]:
+        """Get specific segment by ID.
+        
+        Args:
+            segment_id: Segment ID to retrieve
+            
+        Returns:
+            Segment data or error if not found
+        """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
+        state = await self.get_state()
+        segments = state.get("seg", [])
+        
+        for segment in segments:
+            if segment.get("id") == segment_id:
+                return segment
+        
+        raise ValueError(f"Segment {segment_id} not found. Available segments: {[s.get('id') for s in segments]}")
+    
+    async def set_segment(self, segment_id: int, segment_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update segment configuration.
+        
+        Args:
+            segment_id: Segment ID to update
+            segment_data: Segment properties to update (e.g., col, fx, start, stop, on, etc.)
+            
+        Returns:
+            Updated state from device
+        """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
+        # Ensure segment_id is included in the data and takes precedence
+        segment_update = {**segment_data, "id": segment_id}
+        return await self.set_state({"seg": [segment_update]})
+    
+    async def create_segment(self, start: int, stop: int, segment_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Create a new segment.
+        
+        Args:
+            start: Start LED index (inclusive)
+            stop: Stop LED index (exclusive)
+            segment_data: Optional segment properties (colors, effects, etc.)
+            
+        Returns:
+            Updated state from device
+        """
+        if start < 0:
+            raise ValueError("Start index must be non-negative")
+        if stop < 0:
+            raise ValueError("Stop index must be non-negative")
+        if start >= stop:
+            raise ValueError("Start index must be less than stop index")
+        
+        if segment_data:
+            # Ensure explicit parameters take precedence over any keys in segment_data
+            new_segment = {**segment_data, "start": start, "stop": stop}
+        else:
+            new_segment = {
+                "start": start,
+                "stop": stop,
+            }
+        
+        return await self.set_state({"seg": [new_segment]})
+    
+    async def delete_segment(self, segment_id: int) -> Dict[str, Any]:
+        """Delete a segment by ID.
+        
+        Args:
+            segment_id: Segment ID to delete
+            
+        Returns:
+            Updated state from device
+        """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
+        return await self.set_state({"seg": [{"id": segment_id, "stop": 0}]})

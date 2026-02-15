@@ -2,13 +2,16 @@
 
 A Model Context Protocol (MCP) server for controlling WLED devices through LLM interactions. This server enables Claude and other LLMs to directly control your WLED smart lighting devices with natural language commands.
 
-**NEW: Persistent device storage with YAML config files, in-memory caching, and device management tools!**
+**NEW: Configuration and Segments API - Full control over device settings and LED segments!**
 
 ## Features
 
 - **Persistent Device Storage**: YAML config file with automatic caching for fast access
 - **Device Management Tools**: Add, update, and remove devices via MCP tools
 - **Multi-Device Support**: Control multiple WLED devices simultaneously with named device management
+- **Configuration Access**: Fetch and inspect full device configuration including hardware settings
+- **Segment Control**: Create, modify, and delete LED segments for zone-based control
+- **Debug Tools**: Comprehensive device debugging with combined info, state, config, and segments
 - **Docker Support**: Easy deployment with Docker and docker-compose
 - **Device Control**: Turn WLED devices on/off, adjust brightness (0-255)
 - **Color Management**: Set RGB colors with precise control
@@ -237,6 +240,19 @@ You can now ask Claude to control your WLED devices with natural language:
 
 - `wled_get_info(device_name?: str, direct_ip?: str)` - Get device information (name, version, LED count, capabilities)
 - `wled_get_state(device_name?: str, direct_ip?: str)` - Get current device state (power, brightness, color, effect)
+- `wled_get_config(device_name?: str, direct_ip?: str)` - Get full device configuration (hardware, network, segments config)
+
+### Segments (Zone Control)
+
+- `wled_get_segments(device_name?: str, direct_ip?: str)` - List all LED segments with their configurations
+- `wled_get_segment(segment_id: int, device_name?: str, direct_ip?: str)` - Get specific segment details by ID
+- `wled_set_segment(segment_id: int, segment_json: str, device_name?: str, direct_ip?: str)` - Update segment properties (color, effect, range, etc.)
+- `wled_create_segment(start: int, stop: int, segment_json?: str, device_name?: str, direct_ip?: str)` - Create a new segment with optional properties
+- `wled_delete_segment(segment_id: int, device_name?: str, direct_ip?: str)` - Delete a segment by ID
+
+### Debug & Diagnostics
+
+- `wled_debug_device(device_name?: str, direct_ip?: str)` - Get comprehensive debug info (info + state + config + segments combined)
 
 ### Advanced
 
@@ -276,6 +292,18 @@ Once configured, you can use natural language commands:
 "Set living room to rainbow effect and bedroom to solid red"
 ```
 
+#### Configuration & Segments:
+```
+"Show me the configuration of my WLED device"
+"Get all segments from my device"
+"Set segment 0 to red color"
+"Create a new segment from LED 0 to 30 with blue color"
+"Set segment 1 to rainbow effect with medium speed"
+"Delete segment 2"
+"Give me comprehensive debug info for the living room device"
+"What's the LED count and max segments for my device?"
+```
+
 ### Direct API Usage
 
 ```python
@@ -301,6 +329,27 @@ await wled_set_effect(9, speed=150, intensity=200, device_name="kitchen")
 
 # Get device info
 info = await wled_get_info(device_name="living_room")
+
+# Configuration and segments
+config = await wled_get_config(device_name="living_room")
+segments = await wled_get_segments(device_name="living_room")
+segment_0 = await wled_get_segment(0, device_name="living_room")
+
+# Update segment color
+await wled_set_segment(0, '{"col":[[255,0,0]]}', device_name="living_room")
+
+# Update segment with effect
+await wled_set_segment(0, '{"fx":9,"sx":150,"ix":200}', device_name="living_room")
+
+# Create new segments (zone control)
+await wled_create_segment(0, 30, '{"col":[[255,0,0]]}', device_name="living_room")
+await wled_create_segment(30, 60, '{"col":[[0,0,255]]}', device_name="living_room")
+
+# Delete segment
+await wled_delete_segment(1, device_name="living_room")
+
+# Debug device (get everything at once)
+debug_info = await wled_debug_device(device_name="living_room")
 
 # List all devices
 devices = await wled_list_devices()
@@ -410,7 +459,7 @@ Note: Docker deployment is primarily useful for running the server as a persiste
 
 ### Testing Your Setup
 
-Run the test script to verify everything works:
+Run the test scripts to verify everything works:
 
 #### Single Device:
 ```bash
@@ -425,7 +474,61 @@ export WLED_DEVICE_BEDROOM=192.168.1.101
 python examples/test_multi_device.py
 ```
 
-This will test basic connectivity and functionality with your WLED device(s).
+#### Configuration & Segments:
+```bash
+export WLED_HOST=192.168.1.100
+python examples/test_segments.py      # Test segment features
+python examples/test_mcp_tools.py     # Test all new MCP tools
+```
+
+These scripts will test connectivity and functionality with your WLED device(s).
+
+## Understanding WLED Segments
+
+**Segments** are a powerful WLED feature that allows you to divide your LED strip into multiple zones, each with independent control. This enables creating complex lighting scenes with different colors and effects in different areas of your strip.
+
+### What are Segments?
+
+- Each segment controls a specific range of LEDs (e.g., LEDs 0-30, 31-60)
+- Segments can have different colors, effects, speed, and intensity
+- You can have multiple segments active simultaneously
+- Segments can overlap (though typically they don't)
+- Each WLED device has a maximum number of segments (usually 10-32 depending on version)
+
+### Common Use Cases:
+
+1. **Zone Control**: Different rooms or areas with independent colors
+2. **Mixed Effects**: Rainbow on one segment, solid color on another
+3. **Accent Lighting**: Highlight specific areas with different settings
+4. **Dynamic Scenes**: Create complex multi-zone animations
+
+### Segment Properties:
+
+- `id`: Segment identifier (0, 1, 2, etc.)
+- `start`/`stop`: LED range (stop is exclusive, so 0-30 means LEDs 0-29)
+- `col`: Color array (primary, secondary, tertiary) - e.g., `[[255,0,0]]` for red
+- `fx`: Effect ID (0 for solid, 1+ for various effects)
+- `sx`: Effect speed (0-255)
+- `ix`: Effect intensity (0-255)
+- `pal`: Color palette ID
+- `on`: Segment power state (true/false)
+- `bri`: Segment brightness (0-255)
+- `rev`: Reverse direction (true/false)
+
+### Examples:
+
+```python
+# Get all segments
+segments = await wled_get_segments()
+
+# Create two zones with different colors
+await wled_create_segment(0, 30, '{"col":[[255,0,0]]}')    # Red zone
+await wled_create_segment(30, 60, '{"col":[[0,0,255]]}')   # Blue zone
+
+# Set different effects per segment
+await wled_set_segment(0, '{"fx":9,"sx":150}')   # Rainbow on first zone
+await wled_set_segment(1, '{"fx":0,"col":[[255,255,255]]}')  # Solid white on second
+```
 
 ## Development
 
@@ -435,17 +538,29 @@ This will test basic connectivity and functionality with your WLED device(s).
 wled_mcp/
 ├── wled_mcp/
 │   ├── __init__.py
-│   ├── server.py          # MCP server implementation
-│   └── wled_client.py     # WLED HTTP client
+│   ├── server.py          # MCP server implementation with all tools
+│   └── wled_client.py     # WLED HTTP client with API methods
 ├── examples/
-│   └── test_server.py     # Test script
+│   ├── test_server.py     # Basic functionality test
+│   ├── test_multi_device.py    # Multi-device test
+│   ├── test_segments.py   # Configuration and segments test
+│   └── test_mcp_tools.py  # MCP tools test
 ├── pyproject.toml         # Project configuration
+├── config.example.yaml    # Example YAML config
 └── README.md
 ```
 
+### API Resources
+
+This implementation uses the official WLED JSON API:
+- [WLED JSON API Documentation](https://kno.wled.ge/interfaces/json-api/)
+- [WLED Segments Guide](https://kno.wled.ge/features/segments/)
+- [WLED GitHub Repository](https://github.com/WLED/WLED)
+- [WLED JSON API Library](https://github.com/paul-fornage/wled-json-api-library)
+
 ### Contributing
 
-The server uses WLED's JSON API for reliable communication and supports all standard WLED features. Contributions welcome!
+The server uses WLED's JSON API for reliable communication and supports all standard WLED features including configuration access and segment control. Contributions welcome!
 
 ## License
 
