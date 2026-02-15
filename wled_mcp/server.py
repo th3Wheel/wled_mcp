@@ -1,5 +1,6 @@
 """WLED MCP Server implementation."""
 
+import asyncio
 import json
 import os
 from typing import Any, Dict, Optional
@@ -591,6 +592,208 @@ async def wled_set_state(state_json: str, device_name: Optional[str] = None, dir
         return f"Error: Invalid JSON - {str(e)}"
     except Exception as e:
         logger.error(f"Error setting WLED state: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_get_config(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Get full WLED device configuration including hardware, network, and segment settings.
+    
+    Args:
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with complete device configuration
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        config = await client.get_config()
+        return json.dumps(config, indent=2)
+    except Exception as e:
+        logger.error(f"Error getting WLED config: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_get_segments(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Get all LED segments from WLED device.
+    
+    Segments allow dividing your LED strip into multiple zones with different colors and effects.
+    
+    Args:
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with array of all segments and their configurations
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        segments = await client.get_segments()
+        return json.dumps(segments, indent=2)
+    except Exception as e:
+        logger.error(f"Error getting WLED segments: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_get_segment(segment_id: int, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Get specific LED segment details by ID.
+    
+    Args:
+        segment_id: Segment ID to retrieve (usually 0, 1, 2, etc.)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with segment details including start/stop LEDs, colors, effects
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        segment = await client.get_segment(segment_id)
+        return json.dumps(segment, indent=2)
+    except Exception as e:
+        logger.error(f"Error getting WLED segment: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_set_segment(segment_id: int, segment_json: str, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Update LED segment configuration.
+    
+    Segments allow independent control of different zones of your LED strip.
+    You can set colors, effects, ranges, and other properties per segment.
+    
+    Args:
+        segment_id: Segment ID to update (0, 1, 2, etc.)
+        segment_json: JSON string with segment properties to update.
+                     Common properties: 
+                     - "col": [[R,G,B]] for colors (e.g., [[255,0,0]] for red)
+                     - "fx": effect ID (0 for solid, 1+ for effects)
+                     - "sx": effect speed (0-255)
+                     - "ix": effect intensity (0-255)
+                     - "pal": palette ID
+                     - "start": start LED index
+                     - "stop": stop LED index (exclusive)
+                     - "on": true/false to turn segment on/off
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with updated device state
+        
+    Example:
+        Set segment 0 to solid red: segment_json='{"col":[[255,0,0]]}'
+        Set segment 1 effect to rainbow with speed 150: segment_json='{"fx":9,"sx":150}'
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        segment_data = json.loads(segment_json)
+        result = await client.set_segment(segment_id, segment_data)
+        return json.dumps(result, indent=2)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in segment_json: {e}")
+        return f"Error: Invalid JSON - {str(e)}"
+    except Exception as e:
+        logger.error(f"Error setting WLED segment: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_create_segment(start: int, stop: int, segment_json: Optional[str] = None, 
+                              device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Create a new LED segment on the WLED device.
+    
+    Segments allow you to divide your LED strip into zones with independent control.
+    
+    Args:
+        start: Start LED index (inclusive, 0-based)
+        stop: Stop LED index (exclusive, so stop=30 means up to LED 29)
+        segment_json: Optional JSON string with additional segment properties like colors, effects, etc.
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with updated device state
+        
+    Example:
+        Create segment from LED 0-30 with red color: 
+        start=0, stop=30, segment_json='{"col":[[255,0,0]]}'
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        segment_data = json.loads(segment_json) if segment_json else None
+        result = await client.create_segment(start, stop, segment_data)
+        return json.dumps(result, indent=2)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in segment_json: {e}")
+        return f"Error: Invalid JSON - {str(e)}"
+    except Exception as e:
+        logger.error(f"Error creating WLED segment: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_delete_segment(segment_id: int, device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Delete an LED segment from the WLED device.
+    
+    Args:
+        segment_id: Segment ID to delete (0, 1, 2, etc.)
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with updated device state
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        result = await client.delete_segment(segment_id)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error deleting WLED segment: {e}")
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+async def wled_debug_device(device_name: Optional[str] = None, direct_ip: Optional[str] = None) -> str:
+    """Get comprehensive debug information for WLED device.
+    
+    This tool fetches and combines all available device information for debugging:
+    - Device info (hardware, version, capabilities)
+    - Current state (power, brightness, colors, effects)
+    - Full configuration (network, LED settings, segments config)
+    - Active segments (current segment states)
+    
+    Args:
+        device_name: Name of pre-configured device from registry
+        direct_ip: Direct IP address for ad-hoc connection
+    
+    Returns:
+        JSON string with comprehensive device information for debugging
+    """
+    try:
+        client = get_wled_client(device_name, direct_ip)
+        
+        # Fetch all data in parallel for efficiency
+        info, state, config, segments = await asyncio.gather(
+            client.get_info(),
+            client.get_state(),
+            client.get_config(),
+            client.get_segments(),
+            return_exceptions=True
+        )
+        
+        debug_info = {
+            "info": info if not isinstance(info, Exception) else f"Error: {str(info)}",
+            "state": state if not isinstance(state, Exception) else f"Error: {str(state)}",
+            "config": config if not isinstance(config, Exception) else f"Error: {str(config)}",
+            "segments": segments if not isinstance(segments, Exception) else f"Error: {str(segments)}"
+        }
+        
+        return json.dumps(debug_info, indent=2)
+    except Exception as e:
+        logger.error(f"Error getting WLED debug info: {e}")
         return f"Error: {str(e)}"
 
 
