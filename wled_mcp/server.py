@@ -1,6 +1,6 @@
 """WLED MCP Server implementation."""
 
-import asyncio
+import asyncio  # For gathering parallel async operations in debug tool
 import json
 import os
 from typing import Any, Dict, Optional
