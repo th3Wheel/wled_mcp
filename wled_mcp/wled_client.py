@@ -172,6 +172,9 @@ class WLEDClient:
         Returns:
             Segment data or error if not found
         """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
         state = await self.get_state()
         segments = state.get("seg", [])
         
@@ -191,6 +194,9 @@ class WLEDClient:
         Returns:
             Updated state from device
         """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
         # Ensure segment_id is included in the data and takes precedence
         segment_update = {**segment_data, "id": segment_id}
         return await self.set_state({"seg": [segment_update]})
@@ -206,6 +212,13 @@ class WLEDClient:
         Returns:
             Updated state from device
         """
+        if start < 0:
+            raise ValueError("Start index must be non-negative")
+        if stop < 0:
+            raise ValueError("Stop index must be non-negative")
+        if start >= stop:
+            raise ValueError("Start index must be less than stop index")
+        
         if segment_data:
             # Ensure explicit parameters take precedence over any keys in segment_data
             new_segment = {**segment_data, "start": start, "stop": stop}
@@ -226,4 +239,7 @@ class WLEDClient:
         Returns:
             Updated state from device
         """
+        if segment_id < 0:
+            raise ValueError("Segment ID must be non-negative")
+        
         return await self.set_state({"seg": [{"id": segment_id, "stop": 0}]})
